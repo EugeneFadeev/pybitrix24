@@ -1,7 +1,7 @@
 import json
 
 from bitrix24 import exceptions
-from urllib.parse import urlencode
+from multidimensional_urlencode import urlencode 
 
 
 def resolve_response(response):
@@ -11,6 +11,8 @@ def resolve_response(response):
         result = None
     except TypeError:
         result = None
+    except ValueError:
+        raise ValueError("Can`t parse this text: {}".format(response.text))
     return result
 
 

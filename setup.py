@@ -1,13 +1,13 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='pybitrix24',
-    description='A tiny Python3 client to make requests of Bitrix24 API.',
+    name='python-bitrix24-wrapper',
+    description='A Python3 wrapper to make requests of Bitrix24 API with multi_urlencode.',
     keywords='bitrix24 api rest python3 client',
     version='0.4.0',
-    url='https://github.com/yarbshk/bitrix24-python3-client',
-    author='Yuriy Rabeshko',
-    author_email='george.rabeshko@gmail.com',
+    url='https://github.com/EugeneFadeev/pybitrix24',
+    author='Eugene Fadeev',
+    author_email='fadeev2012fadeev@gmail.com',
     license='MIT',
     classifiers=[
         'Development Status :: 4 - Beta',

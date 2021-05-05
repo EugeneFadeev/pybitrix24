@@ -1,7 +1,12 @@
+import logging
+from datetime import datetime
+
 import requests
 
-from bitrix24 import utils
+from pybitrix24 import utils
 from urllib.parse import urlencode
+
+logger = logging.getLogger(__name__)
 
 
 class Bitrix24(object):
@@ -15,18 +20,36 @@ class Bitrix24(object):
     def __init__(self, domain, client_id=None, client_secret=None,
                  access_token=None, client_endpoint=None, expires_in=3600,
                  refresh_token=None, scope='', server_endpoint=None,
-                 transport='json', user_id=0):
+                 transport='json', user_id=0, debug=False, session=None):
+        """
+        Init bitrix24 object
+        :param domain: Bitrix24 portal
+        :param client_id: Application ID
+        :param client_secret: Application secret key
+        :param access_token: Access token for Rest API
+        :param client_endpoint:
+        :param expires_in:
+        :param refresh_token:
+        :param scope:
+        :param server_endpoint:
+        :param transport:
+        :param user_id:
+        :param debug:
+        :param session:
+        """
         self.access_token = access_token
         self.client_id = client_id
-        self.client_endpoint = client_endpoint # Must endswith a slash
+        self.client_endpoint = client_endpoint  # Must endswith a slash
         self.client_secret = client_secret
-        self.domain = domain # Without protocol and an ending slash
-        self.expires_in = expires_in # Tokens expire in 1 hour by default
+        self.domain = domain  # Without protocol and an ending slash
+        self.expires_in = expires_in  # Tokens expire in 1 hour by default
         self.refresh_token = refresh_token
-        self.scope = scope # The default value means all available scopes
-        self.server_endpoint = server_endpoint # Must endswith a slash
-        self.transport = transport # Allowable values are 'json' or 'xml'
-        self.user_id = user_id # The default value means current user
+        self.scope = scope  # The default value means all available scopes
+        self.server_endpoint = server_endpoint  # Must endswith a slash
+        self.transport = transport  # Allowable values are 'json' or 'xml'
+        self.user_id = user_id  # The default value means current user
+        self.debug = debug  # debug
+        self.session = session
 
     def get_tokens(self):
         """
@@ -59,8 +82,7 @@ class Bitrix24(object):
         Returns correct client endpoint even if wasn't provided.
         :return: str Client endpoint
         """
-        return self.client_endpoint \
-            or self._client_endpoint_template.format(domain=self.domain)
+        return self.client_endpoint or self._client_endpoint_template.format(domain=self.domain)
 
     def _resolve_oauth_endpoint(self, action, query=None):
         """
@@ -96,10 +118,17 @@ class Bitrix24(object):
         :return: dict Encoded response text
         """
         url = self._resolve_oauth_endpoint('token')
+        r = None
         try:
-            r = requests.get(url, params=query)
+            if self.session:
+                r = self.session.get(url, params=query)
+            else:
+                r = requests.get(url, params=query)
         except requests.exceptions.RequestException:
-            r = None
+            if r:
+                logger.exception(f'_request_tokens RequestException {self.domain} | {r.status_code} | {r.text}')
+            else:
+                logger.exception(f'_request_tokens RequestException {self.domain}')
         result = utils.resolve_response(r)
         return result
 
@@ -161,10 +190,21 @@ class Bitrix24(object):
         """
         url = self._resolve_call_url(method)
         query = {'auth': self.access_token}
+        st_date = datetime.now()
+        r = None
         try:
-            r = requests.post(url, json=params, params=query)
+            if self.session:
+                r = self.session.post(url, json=params, params=query)
+            else:
+                r = requests.post(url, json=params, params=query)
         except requests.exceptions.RequestException:
-            r = None
+            logger.exception('After call_method {} | domain {}'.format(method, self.domain))
+            if r:
+                logger.exception(f'<call_method> Domain:{self.domain}| Method:{method}| Query:{query}| '
+                                 f'Headers:{r.headers}| StatusCode:{r.status_code}| Reason: {r.reason}| Elapsed:{r.elapsed}')
+            else:
+                logger.exception(f'<call_method> Domain:{self.domain}| Method:{method}| Query:{query}| '
+                                 f'Params:{params}| URL:{url}| Elapsed:{datetime.now() - st_date}')
         result = utils.resolve_response(r)
         return result
 
@@ -228,9 +268,27 @@ class Bitrix24(object):
         endpoint = self._resolve_webhook_endpoint(code)
         url = self._resolve_call_url(method, endpoint=endpoint)
         query = {'auth': self.access_token}
+
+        if self.debug:
+            logger.info('Before {}'.format(str(self.__dict__)))
+            logger.info('Before Call {} | domain {}'.format(method, self.domain))
+            logger.info('Before url: {}'.format(url))
+            logger.info('Before params: {}'.format(params))
+            logger.info('Before query: {}'.format(query))
+            st_date = datetime.now()
         try:
-            r = requests.post(url, json=params, params=query)
+            if self.session:
+                r = self.session.post(url, json=params, params=query)
+            else:
+                r = requests.post(url, json=params, params=query)
+            if self.debug:
+                end_date = datetime.now()
+                logger.info('After Call {} | domain {}'.format(method, self.domain))
+                logger.info('After headers: {}'.format(r.headers))
+                logger.info('After res: {}'.format(r.text))
+                logger.info('After time: {}'.format(end_date - st_date))
         except requests.exceptions.RequestException:
+            logger.exception('After Call {} | domain {}'.format(method, self.domain))
             r = None
         result = utils.resolve_response(r)
         return result

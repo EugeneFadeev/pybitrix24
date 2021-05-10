@@ -1,6 +1,7 @@
 import json
 import logging
 
+import requests
 from pybitrix24 import exceptions
 
 
@@ -107,3 +108,32 @@ def prepare_batch(calls):
                 raise exceptions.BatchInstanceError(name, [str, tuple, dict])
         commands[name] = command
     return commands
+
+
+def bitrix_refresh_tokens(refresh_token, client_id, client_secret):
+    oauth_url = 'https://oauth.bitrix.info/oauth/token/'
+    r = {}
+    result = {}
+
+    try:
+        # Make call to oauth server
+        r = requests.post(
+            oauth_url,
+            params={
+                'grant_type': 'refresh_token',
+                'client_id': client_id,
+                'client_secret': client_secret,
+                'refresh_token': refresh_token
+            }
+        )
+        res = json.loads(r.text)
+        # Renew access tokens
+        result['success'] = True
+        result['access_token'] = res['access_token']
+        result['refresh_token'] = res['refresh_token']
+        logger.info(['Tokens', result['access_token'], result['refresh_token']])
+        return result
+    except (ValueError, KeyError):
+        result['error'] = dict(error='Error on decode oauth response [' + r.text + ']')
+        result['success'] = False
+        return result
